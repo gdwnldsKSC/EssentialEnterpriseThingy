@@ -18,7 +18,7 @@ OBJS = EET.OBJ DRIVEMAP.OBJ DEFRAG.OBJ TCPIP.OBJ PKTDRV.OBJ
 
 # ---- Borland C++ 3.1 -------------------------------------------------
 CC     = bcc
-CFLAGS = -ml -O2 -w- -d -DDOS
+CFLAGS = -ml -O2 -w-par -w-stu -d -DDOS
 LINK   = tlink
 LFLAGS = /m /s /c
 # c0l.obj = large-model C startup; cl.lib = large-model C run-time

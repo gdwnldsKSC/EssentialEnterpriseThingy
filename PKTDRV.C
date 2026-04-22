@@ -74,41 +74,45 @@ static void far receiver(void)
 {
 #if defined(__TURBOC__) || defined(__BORLANDC__)
     _asm {
-        /* Save registers we will clobber */
+        /*
+         * The packet driver calls this routine from its ISR.
+         * Registers on entry:
+         *   AX = 0  --> driver wants a receive buffer; return ES:DI
+         *   AX = 1  --> data has been placed in our buffer (CX=len)
+         *   BX = handle, CX = frame length
+         *
+         * We save every register we touch (AX included via BX below)
+         * and restore them before returning.  DS is saved first so
+         * we can reload our own data segment for globals access; the
+         * original AX value (call type 0 or 1) is preserved in BX
+         * across the DS reload.
+         */
         push bx
         push cx
         push dx
         push si
         push ds
 
-        /* Load our data segment so we can access module globals */
+        /* Preserve the call-type flag (AX) in SI before we need AX
+         * for segment arithmetic.                                    */
+        mov  si, ax
+
+        /* Load our module's data segment */
         mov  ax, seg g_rxBuf
         mov  ds, ax
 
-        /* Check which call this is (passed in AX by the driver) */
-        pop  ds             /* restore temporarily to get ax value */
-        push ds             /* re-save */
-
-        /* Branching on AX:
-         *   AX=0  --> driver wants a buffer; return ES:DI
-         *   AX=1  --> driver has written data; set ready flag    */
-
-        /* We inline both paths using the stack frame */
-
-        /* --- First call (AX=0): provide buffer address --------- */
-        or   ax, ax
+        /* Branch on call type (0 = provide buffer, 1 = data ready) */
+        or   si, si
         jnz  second_call
 
-        /* Return our receive buffer in ES:DI */
+        /* --- First call (AX=0): return buffer address in ES:DI --- */
         mov  ax, seg g_rxBuf
         mov  es, ax
         lea  di, g_rxBuf
         jmp  recv_done
 
-        /* --- Second call (AX=1): data copied into g_rxBuf ------ */
+        /* --- Second call (AX=1): record received length, signal -- */
     second_call:
-        mov  ax, seg g_rxLen
-        mov  ds, ax
         mov  g_rxLen,   cx
         mov  g_rxReady, 1
 

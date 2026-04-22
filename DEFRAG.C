@@ -610,7 +610,7 @@ int defrag_volume(char driveLetter, BOOL verbose)
 
     if (fragCount == 0) {
         if (verbose)
-            printf("  Volume is already optimised.\n");
+            printf("  Volume is already optimized.\n");
         farfree(g_vol.fat);
         return ERR_OK;
     }

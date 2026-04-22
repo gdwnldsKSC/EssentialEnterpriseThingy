@@ -58,7 +58,7 @@ static struct {
     WORD  seq;
     DWORD sendTick;
     DWORD rttTicks;
-} g_ping;
+} g_pingState;
 
 /* ================================================================ */
 /*  Utility                                                         */
@@ -85,13 +85,14 @@ static WORD ip_cksum(const void far *buf, WORD len)
     DWORD           sum = 0;
 
     while (len > 1) {
-        WORD word = (WORD)(*p) | ((WORD)(*(p + 1)) << 8);
+        /* Read each 16-bit word in network (big-endian) byte order */
+        WORD word = ((WORD)(*p) << 8) | (WORD)(*(p + 1));
         sum += word;
         p   += 2;
         len -= 2;
     }
     if (len == 1)
-        sum += (WORD)(*p);
+        sum += ((WORD)(*p)) << 8;   /* pad odd byte in high position */
 
     while (sum >> 16)
         sum = (sum & 0xFFFF) + (sum >> 16);
@@ -376,9 +377,9 @@ static void process_icmp(const BYTE far *data, WORD len)
 
     if (icmp->type               == ICMP_ECHOREPLY &&
         ntohs(icmp->id)          == 0xEE71         &&
-        ntohs(icmp->seq)         == g_ping.seq) {
-        g_ping.gotReply = TRUE;
-        g_ping.rttTicks = bios_ticks() - g_ping.sendTick;
+        ntohs(icmp->seq)         == g_pingState.seq) {
+        g_pingState.gotReply = TRUE;
+        g_pingState.rttTicks = bios_ticks() - g_pingState.sendTick;
     }
 }
 
@@ -538,10 +539,10 @@ int ping_host(const BYTE *dstIP, int count, int verbose)
     for (i = 0; i < count; i++) {
         DWORD deadline;
 
-        g_ping.gotReply = FALSE;
-        g_ping.seq      = (WORD)i;
-        g_ping.sendTick = bios_ticks();
-        g_ping.rttTicks = 0;
+        g_pingState.gotReply = FALSE;
+        g_pingState.seq      = (WORD)i;
+        g_pingState.sendTick = bios_ticks();
+        g_pingState.rttTicks = 0;
 
         rc = send_ping(dstIP, (WORD)i);
         if (rc != ERR_OK) {
@@ -552,11 +553,11 @@ int ping_host(const BYTE *dstIP, int count, int verbose)
         deadline = bios_ticks() +
                    (DWORD)BIOS_TICKS_SEC * PING_TIMEOUT_SEC;
 
-        while (!g_ping.gotReply && bios_ticks() < deadline)
+        while (!g_pingState.gotReply && bios_ticks() < deadline)
             poll_network();
 
-        if (g_ping.gotReply) {
-            DWORD rttMs = (g_ping.rttTicks * 1000UL)
+        if (g_pingState.gotReply) {
+            DWORD rttMs = (g_pingState.rttTicks * 1000UL)
                         / (DWORD)BIOS_TICKS_SEC;
             if (verbose)
                 printf("  Reply from %d.%d.%d.%d: "
