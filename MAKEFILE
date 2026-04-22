@@ -1,0 +1,63 @@
+# MAKEFILE  -  EssentialEnterpriseThingy v3.2
+#
+# Builds EET.EXE: a self-contained 16-bit MS-DOS executable.
+#
+# Supported compilers
+# -------------------
+#   Borland C++ 3.1  (default)  -- invoke with: MAKE
+#   Watcom C/C++ 10.x           -- invoke with: MAKE WATCOM=1
+#
+# Both produce a large-memory-model DOS real-mode binary.
+#
+# Requirements: DOS MAKE (Borland MAKE 3.x or Watcom WMAKE),
+#               the chosen compiler on PATH.
+
+OBJS = EET.OBJ DRIVEMAP.OBJ DEFRAG.OBJ TCPIP.OBJ PKTDRV.OBJ
+
+!ifndef WATCOM
+
+# ---- Borland C++ 3.1 -------------------------------------------------
+CC     = bcc
+CFLAGS = -ml -O2 -w- -d -DDOS
+LINK   = tlink
+LFLAGS = /m /s /c
+# c0l.obj = large-model C startup; cl.lib = large-model C run-time
+STARTUP = c0l
+LIBS    = cl
+
+EET.EXE: $(OBJS)
+	$(LINK) $(LFLAGS) $(STARTUP) $(OBJS), EET.EXE,, $(LIBS)
+
+.c.obj:
+	$(CC) $(CFLAGS) -c $<
+
+!else
+
+# ---- Watcom C/C++ 10.x -----------------------------------------------
+CC     = wcc
+CFLAGS = -ml -ox -w3 -DDOS -zu
+LINK   = wlink
+SYSTEM = dos
+
+EET.EXE: $(OBJS)
+	$(LINK) system $(SYSTEM) name EET.EXE &
+	        file EET.OBJ,DRIVEMAP.OBJ,DEFRAG.OBJ,TCPIP.OBJ,PKTDRV.OBJ
+
+.c.obj:
+	$(CC) $(CFLAGS) $<
+
+!endif
+
+# ---- Explicit dependencies -------------------------------------------
+
+EET.OBJ:      EET.C      EET.H
+DRIVEMAP.OBJ: DRIVEMAP.C EET.H
+DEFRAG.OBJ:   DEFRAG.C   EET.H
+TCPIP.OBJ:    TCPIP.C    EET.H
+PKTDRV.OBJ:   PKTDRV.C   EET.H
+
+# ---- Housekeeping ----------------------------------------------------
+
+clean:
+	del *.OBJ
+	del EET.EXE
